@@ -4,4 +4,5 @@ type: manager
 requirements:
   - https://github.com/AI-Driven-Highspeed-Development/Logger-Util.git
   - https://github.com/AI-Driven-Highspeed-Development/Config-Manager.git
+  - https://github.com/AI-Driven-Highspeed-Development/cli_manager.git
 repo_url: https://github.com/AI-Driven-Highspeed-Development/external_media_manager.git

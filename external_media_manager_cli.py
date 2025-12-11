@@ -26,7 +26,7 @@ def scan_folder(args: argparse.Namespace) -> int:
     if args.extensions:
         extensions = set(args.extensions.split(","))
 
-    manager = ExternalMediaManager(extensions=extensions)
+    manager = ExternalMediaManager()
 
     try:
         result = manager.scan_folder(

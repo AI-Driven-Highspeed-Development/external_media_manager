@@ -6,6 +6,7 @@ Optional: Install watchdog with `pip install watchdog>=3.0.0`
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
@@ -98,19 +99,19 @@ class MediaFileEventHandler(FileSystemEventHandler):  # type: ignore[misc]
 
 
 class FileWatcher:
-    """Watches folders for media file changes."""
+    """Watches folders for media file changes.
+    
+    Note: Requires watchdog library. Install with: pip install watchdog>=3.0.0
+    Check availability with is_watchdog_available() before instantiating.
+    Thread-safe: all public methods use internal locking.
+    """
 
     def __init__(self, extensions: set[str]) -> None:
-        if not WATCHDOG_AVAILABLE:
-            raise ImportError(
-                "watchdog is not installed. "
-                "Install with: pip install watchdog>=3.0.0"
-            )
-
         self.logger = Logger(name=__class__.__name__)
         self._extensions = extensions
         self._observer: Any = None
         self._watches: dict[Path, object] = {}
+        self._lock = threading.Lock()
 
     def watch(
         self,
@@ -132,9 +133,16 @@ class FileWatcher:
             on_moved: Callback for file move/rename.
 
         Raises:
+            ImportError: If watchdog is not installed.
             FileNotFoundError: If path does not exist.
             NotADirectoryError: If path is not a directory.
         """
+        if not WATCHDOG_AVAILABLE:
+            raise ImportError(
+                "watchdog is not installed. "
+                "Install with: pip install watchdog>=3.0.0"
+            )
+
         folder = Path(path).resolve()
 
         if not folder.exists():
@@ -142,21 +150,22 @@ class FileWatcher:
         if not folder.is_dir():
             raise NotADirectoryError(f"Path is not a directory: {folder}")
 
-        if self._observer is None:
-            self._observer = Observer()
-            self._observer.start()
-            self.logger.debug("Observer started")
+        with self._lock:
+            if self._observer is None:
+                self._observer = Observer()
+                self._observer.start()
+                self.logger.debug("Observer started")
 
-        handler = MediaFileEventHandler(
-            extensions=self._extensions,
-            on_created=on_created,
-            on_modified=on_modified,
-            on_deleted=on_deleted,
-            on_moved=on_moved,
-        )
+            handler = MediaFileEventHandler(
+                extensions=self._extensions,
+                on_created=on_created,
+                on_modified=on_modified,
+                on_deleted=on_deleted,
+                on_moved=on_moved,
+            )
 
-        watch = self._observer.schedule(handler, str(folder), recursive=recursive)
-        self._watches[folder] = watch
+            watch = self._observer.schedule(handler, str(folder), recursive=recursive)
+            self._watches[folder] = watch
 
         self.logger.info(f"Watching folder: {folder} (recursive={recursive})")
 
@@ -171,33 +180,43 @@ class FileWatcher:
         """
         folder = Path(path).resolve()
 
-        if folder not in self._watches or self._observer is None:
-            return False
+        with self._lock:
+            if folder not in self._watches or self._observer is None:
+                return False
 
-        watch = self._watches.pop(folder)
-        self._observer.unschedule(watch)
+            watch = self._watches.pop(folder)
+            self._observer.unschedule(watch)
+
         self.logger.info(f"Stopped watching folder: {folder}")
-
         return True
 
-    def stop(self) -> None:
-        """Stop all watching and clean up."""
-        if self._observer is not None:
-            self._observer.stop()
-            self._observer.join()
-            self._observer = None
-            self._watches.clear()
-            self.logger.debug("Observer stopped")
+    def stop(self, timeout: float = 5.0) -> None:
+        """Stop all watching and clean up.
+        
+        Args:
+            timeout: Maximum seconds to wait for observer thread to stop.
+        """
+        with self._lock:
+            if self._observer is not None:
+                self._observer.stop()
+                self._observer.join(timeout=timeout)
+                if self._observer.is_alive():
+                    self.logger.warning("Observer thread did not stop within timeout")
+                self._observer = None
+                self._watches.clear()
+                self.logger.debug("Observer stopped")
 
     @property
     def is_watching(self) -> bool:
         """Return whether any folders are being watched."""
-        return self._observer is not None and len(self._watches) > 0
+        with self._lock:
+            return self._observer is not None and len(self._watches) > 0
 
     @property
     def watched_folders(self) -> list[Path]:
         """Return list of currently watched folders."""
-        return list(self._watches.keys())
+        with self._lock:
+            return list(self._watches.keys())
 
 
 def is_watchdog_available() -> bool:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -83,7 +84,8 @@ class FileIndexer:
         Args:
             media_file: MediaFile to index.
         """
-        key = str(media_file.path)
+        # Always resolve to ensure consistent key lookup
+        key = str(Path(media_file.path).resolve())
         self._index[key] = media_file.to_dict()
 
     def add_scan_result(self, result: ScanResult) -> int:
@@ -161,10 +163,11 @@ class FileIndexer:
             List of file info dicts in the folder.
         """
         folder_str = str(Path(folder).resolve())
+        folder_prefix = folder_str + os.sep
         return [
             info
             for path, info in self._index.items()
-            if path.startswith(folder_str)
+            if path.startswith(folder_prefix) or path == folder_str
         ]
 
     def get_stats(self) -> dict:

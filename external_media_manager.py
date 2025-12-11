@@ -36,6 +36,7 @@ class ExternalMediaManager:
         path: str | Path,
         recursive: bool = True,
         extensions: Optional[set[str]] = None,
+        follow_symlinks: bool = False,
     ) -> ScanResult:
         """Scan a folder for media files.
 
@@ -43,6 +44,7 @@ class ExternalMediaManager:
             path: Root folder to scan.
             recursive: Whether to scan subdirectories.
             extensions: Override default extensions for this scan.
+            follow_symlinks: Whether to follow symbolic links (default: False for security).
 
         Returns:
             ScanResult with discovered files and metadata.
@@ -71,7 +73,21 @@ class ExternalMediaManager:
 
         pattern = "**/*" if recursive else "*"
         for file_path in folder.glob(pattern):
+            # Skip symlinks unless explicitly following
+            if file_path.is_symlink() and not follow_symlinks:
+                continue
+
             if not file_path.is_file():
+                continue
+
+            # Security: ensure file is still within scan root
+            try:
+                resolved = file_path.resolve()
+                # Use is_relative_to for robust path containment check (Python 3.9+)
+                if not resolved.is_relative_to(folder):
+                    self.logger.warning(f"Skipping symlink outside scan root: {file_path}")
+                    continue
+            except OSError:
                 continue
 
             ext = file_path.suffix.lower().lstrip(".")
