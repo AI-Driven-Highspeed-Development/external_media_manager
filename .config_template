@@ -1,0 +1,6 @@
+{
+    "module_name": "external_media_manager",
+    "path": {
+        "data": "./project/data/external_media_manager"
+    }
+}
