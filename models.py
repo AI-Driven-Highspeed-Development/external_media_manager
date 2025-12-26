@@ -4,8 +4,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum, auto
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # Future type-only imports
+
+
+class EventType(Enum):
+    """Types of media events emitted by the manager."""
+
+    FILE_DISCOVERED = auto()
+    FILE_MODIFIED = auto()
+    FILE_DELETED = auto()
+    SCAN_COMPLETED = auto()
 
 
 @dataclass
@@ -77,3 +90,14 @@ class ScanResult:
             "errors": self.errors,
             "files": [f.to_dict() for f in self.files],
         }
+
+
+@dataclass
+class MediaEvent:
+    """Event emitted when media files are discovered, modified, or deleted."""
+
+    event_type: EventType
+    media_file: Optional[MediaFile]  # None for SCAN_COMPLETED
+    timestamp: datetime = field(default_factory=datetime.now)
+    source_path: Path = field(default_factory=lambda: Path("."))
+    files_found: int = 0  # For SCAN_COMPLETED events
