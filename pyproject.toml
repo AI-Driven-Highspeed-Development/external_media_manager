@@ -1,0 +1,23 @@
+[project]
+name = "external-media-manager"
+version = "0.0.1"
+description = "ADHD Framework manager: external_media_manager"
+requires-python = ">=3.11"
+dependencies = [
+    "logger-util",
+    "config-manager",
+    "cli-manager",
+    "watchdog>=3.0.0",
+]
+
+[tool.adhd]
+type = "manager"
+layer = "runtime"
+
+[tool.uv.sources]
+logger-util = { workspace = true }
+config-manager = { workspace = true }
+cli-manager = { workspace = true }
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
